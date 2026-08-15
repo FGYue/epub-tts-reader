@@ -1,0 +1,2993 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport"
+      content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#111827">
+
+<title>EPUB TTS Reader 2.2</title>
+
+<style>
+*{box-sizing:border-box}
+
+:root{
+    --bg:#f4f5f7;
+    --card:#fff;
+    --text:#202124;
+    --muted:#6b7280;
+    --border:#dedede;
+    --accent:#2563eb;
+    --highlight:#ffe66d;
+}
+
+html,body{
+    margin:0;
+    padding:0;
+    background:var(--bg);
+    color:var(--text);
+    font-family:-apple-system,
+        BlinkMacSystemFont,
+        "SF Pro Text",
+        "PingFang TC",
+        "Noto Sans TC",
+        sans-serif;
+}
+
+body{
+    padding-bottom:
+        calc(100px + env(safe-area-inset-bottom));
+}
+
+header{
+    position:sticky;
+    top:0;
+    z-index:50;
+    padding:
+        10px
+        max(12px,env(safe-area-inset-right))
+        10px
+        max(12px,env(safe-area-inset-left));
+    background:rgba(245,245,247,.95);
+    backdrop-filter:blur(18px);
+    border-bottom:1px solid var(--border);
+}
+
+h1{
+    margin:0 0 8px;
+    font-size:18px;
+}
+
+.toolbar{
+    display:flex;
+    gap:7px;
+    flex-wrap:wrap;
+}
+
+button,
+select,
+input[type=text]{
+    font:inherit;
+    padding:9px 11px;
+    border:1px solid var(--border);
+    border-radius:10px;
+    background:var(--card);
+    color:var(--text);
+}
+
+button{
+    cursor:pointer;
+}
+
+button.primary{
+    background:var(--accent);
+    border-color:var(--accent);
+    color:#fff;
+}
+
+button:disabled{
+    opacity:.45;
+}
+
+.fileButton{
+    display:inline-block;
+    padding:9px 11px;
+    border:1px solid var(--border);
+    border-radius:10px;
+    background:var(--card);
+    cursor:pointer;
+}
+
+.fileButton input{
+    display:none;
+}
+
+#status{
+    min-height:18px;
+    margin-top:7px;
+    font-size:13px;
+    color:var(--muted);
+    white-space:pre-wrap;
+}
+
+main{
+    width:min(900px,100%);
+    margin:auto;
+    padding:14px;
+}
+
+.panel{
+    display:none;
+    margin-bottom:12px;
+    padding:13px;
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:13px;
+}
+
+.settingRow{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    flex-wrap:wrap;
+    margin:9px 0;
+}
+
+.settingRow label{
+    min-width:95px;
+}
+
+.grow{
+    flex:1;
+}
+
+.small{
+    font-size:12px;
+}
+
+.muted{
+    color:var(--muted);
+}
+
+#toc button{
+    display:block;
+    width:100%;
+    text-align:left;
+    border:0;
+    border-bottom:1px solid #eee;
+    border-radius:0;
+}
+
+#reader{
+    min-height:55vh;
+    padding:24px 18px;
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:14px;
+    font-size:20px;
+    line-height:1.95;
+    overflow-wrap:anywhere;
+}
+
+#reader h1,
+#reader h2,
+#reader h3{
+    line-height:1.35;
+}
+
+#reader p{
+    margin:0 0 1em;
+}
+
+.char{
+    border-radius:4px;
+    transition:background .05s;
+}
+
+.char.active{
+    background:var(--highlight);
+    color:#111;
+    box-shadow:0 0 0 2px var(--highlight);
+}
+
+#bottomBar{
+    position:fixed;
+    left:0;
+    right:0;
+    bottom:0;
+    z-index:60;
+    padding:
+        9px
+        max(10px,env(safe-area-inset-right))
+        calc(9px + env(safe-area-inset-bottom))
+        max(10px,env(safe-area-inset-left));
+    background:rgba(255,255,255,.97);
+    backdrop-filter:blur(18px);
+    border-top:1px solid var(--border);
+}
+
+.bottomInner{
+    width:min(900px,100%);
+    margin:auto;
+    display:flex;
+    align-items:center;
+    gap:7px;
+    flex-wrap:wrap;
+}
+
+#position{
+    font-size:12px;
+    color:var(--muted);
+}
+
+input[type=range]{
+    width:120px;
+}
+
+.hidden{
+    display:none!important;
+}
+
+.error{
+    color:#b91c1c;
+}
+</style>
+</head>
+
+<body>
+
+<header>
+
+<h1>EPUB TTS Reader 2.2</h1>
+
+<div class="toolbar">
+
+<label class="fileButton">
+載入 EPUB
+<input id="epubFile"
+       type="file"
+       accept=".epub,application/epub+zip">
+</label>
+
+<button id="tocButton" disabled>
+目錄
+</button>
+
+<button id="settingsButton">
+TTS 設定
+</button>
+
+<button id="stopButton" disabled>
+停止
+</button>
+
+</div>
+
+<div id="status">
+尚未載入 EPUB
+</div>
+
+</header>
+
+
+<main>
+
+<section id="settings" class="panel">
+
+<div class="settingRow">
+
+<label>TTS 引擎</label>
+
+<select id="ttsEngine">
+
+<option value="native">
+iPhone 系統 TTS
+</option>
+
+<option value="hf">
+Hugging Face Qwen3-TTS
+</option>
+
+</select>
+
+</div>
+
+
+<div id="hfSettings">
+
+<div class="settingRow">
+
+<label>Space</label>
+
+<input id="hfSpace"
+       class="grow"
+       type="text"
+       value="Qwen/Qwen3-TTS">
+
+</div>
+
+
+<div class="settingRow">
+
+<label>語言</label>
+
+<select id="hfLanguage">
+
+<option value="Auto">Auto</option>
+<option value="Chinese" selected>Chinese</option>
+<option value="English">English</option>
+<option value="Japanese">Japanese</option>
+<option value="Korean">Korean</option>
+<option value="French">French</option>
+<option value="German">German</option>
+<option value="Spanish">Spanish</option>
+<option value="Portuguese">Portuguese</option>
+<option value="Russian">Russian</option>
+
+</select>
+
+</div>
+
+
+<div class="settingRow">
+
+<label>聲音</label>
+
+<select id="hfSpeaker">
+
+<option>Aiden</option>
+<option>Dylan</option>
+<option>Eric</option>
+<option>Ono_anna</option>
+<option>Ryan</option>
+<option selected>Serena</option>
+<option>Sohee</option>
+<option>Uncle_fu</option>
+<option>Vivian</option>
+
+</select>
+
+</div>
+
+
+<div class="settingRow">
+
+<label>模型</label>
+
+<select id="hfModel">
+
+<option value="0.6B">0.6B</option>
+<option value="1.7B" selected>1.7B</option>
+
+</select>
+
+</div>
+
+
+<div class="settingRow">
+
+<label>語氣</label>
+
+<input id="hfInstruct"
+       class="grow"
+       type="text"
+       placeholder="例如：自然、溫柔、像有聲書一樣朗讀">
+
+</div>
+
+<p class="small muted">
+
+Hugging Face 只在選擇 Qwen3-TTS 並開始播放時才會載入。
+EPUB 載入本身完全不依賴 Hugging Face。
+
+</p>
+
+</div>
+
+</section>
+
+
+<section id="toc"
+         class="panel"></section>
+
+
+<article id="reader">
+
+<p>請先載入 EPUB。</p>
+
+</article>
+
+</main>
+
+
+<div id="bottomBar">
+
+<div class="bottomInner">
+
+<button id="previousButton" disabled>
+上一段
+</button>
+
+<button id="playButton"
+        class="primary"
+        disabled>
+播放
+</button>
+
+<button id="nextButton" disabled>
+下一段
+</button>
+
+<span id="position" class="grow">
+0 / 0
+</span>
+
+<label class="small">
+
+速度
+
+<input id="rate"
+       type="range"
+       min="0.5"
+       max="2"
+       step="0.05"
+       value="1">
+
+<span id="rateValue">1.00</span>x
+
+</label>
+
+</div>
+
+</div>
+
+
+<script>
+
+/* =====================================================
+   EPUB TTS Reader 2.2
+
+   重要：
+
+   這個 script 完全不 import Hugging Face。
+
+   所以即使：
+   - CDN 失敗
+   - HF Space 關閉
+   - Gradio 出錯
+
+   EPUB 本身仍然可以正常工作。
+===================================================== */
+
+
+/* =====================================================
+   DOM
+===================================================== */
+
+const $ = id =>
+    document.getElementById(id);
+
+
+const reader =
+    $("reader");
+
+const status =
+    $("status");
+
+
+function setStatus(text){
+
+    status.textContent =
+        String(text);
+
+}
+
+
+/* =====================================================
+   ZIP parser
+===================================================== */
+
+const decoder =
+    new TextDecoder("utf-8");
+
+
+function u16(view, offset){
+
+    return view.getUint16(
+        offset,
+        true
+    );
+
+}
+
+
+function u32(view, offset){
+
+    return view.getUint32(
+        offset,
+        true
+    );
+
+}
+
+
+async function inflateRaw(bytes){
+
+    if(!("DecompressionStream" in window)){
+
+        throw new Error(
+            "此 Safari 不支援 EPUB 解壓縮。"
+        );
+
+    }
+
+    const stream =
+        new Blob([bytes])
+        .stream()
+        .pipeThrough(
+            new DecompressionStream(
+                "deflate-raw"
+            )
+        );
+
+    return new Uint8Array(
+        await new Response(stream)
+        .arrayBuffer()
+    );
+
+}
+
+
+async function openZip(file){
+
+    const buffer =
+        await file.arrayBuffer();
+
+    const bytes =
+        new Uint8Array(buffer);
+
+    const view =
+        new DataView(buffer);
+
+
+    let eocd = -1;
+
+    const min =
+        Math.max(
+            0,
+            bytes.length - 66000
+        );
+
+
+    for(
+        let i = bytes.length - 22;
+        i >= min;
+        i--
+    ){
+
+        if(
+            u32(view,i) ===
+            0x06054b50
+        ){
+
+            eocd = i;
+            break;
+
+        }
+
+    }
+
+
+    if(eocd < 0){
+
+        throw new Error(
+            "找不到 ZIP End of Central Directory。"
+        );
+
+    }
+
+
+    const count =
+        u16(view,eocd + 10);
+
+    const cdOffset =
+        u32(view,eocd + 16);
+
+
+    const entries =
+        new Map();
+
+
+    let pos =
+        cdOffset;
+
+
+    for(
+        let i=0;
+        i<count;
+        i++
+    ){
+
+        if(
+            u32(view,pos) !==
+            0x02014b50
+        ){
+
+            throw new Error(
+                "EPUB ZIP Central Directory 損壞。"
+            );
+
+        }
+
+
+        const method =
+            u16(view,pos + 10);
+
+        const compressedSize =
+            u32(view,pos + 20);
+
+        const nameLength =
+            u16(view,pos + 28);
+
+        const extraLength =
+            u16(view,pos + 30);
+
+        const commentLength =
+            u16(view,pos + 32);
+
+        const localOffset =
+            u32(view,pos + 42);
+
+
+        const name =
+            decoder.decode(
+                bytes.slice(
+                    pos + 46,
+                    pos + 46 + nameLength
+                )
+            );
+
+
+        entries.set(
+            name,
+            {
+                method,
+                compressedSize,
+                localOffset
+            }
+        );
+
+
+        pos +=
+            46 +
+            nameLength +
+            extraLength +
+            commentLength;
+
+    }
+
+
+    async function get(name){
+
+        const entry =
+            entries.get(name);
+
+
+        if(!entry){
+
+            throw new Error(
+                "EPUB 找不到檔案：\n" +
+                name
+            );
+
+        }
+
+
+        const local =
+            entry.localOffset;
+
+
+        if(
+            u32(view,local) !==
+            0x04034b50
+        ){
+
+            throw new Error(
+                "ZIP Local Header 損壞：\n" +
+                name
+            );
+
+        }
+
+
+        const nameLength =
+            u16(view,local + 26);
+
+        const extraLength =
+            u16(view,local + 28);
+
+
+        const start =
+            local +
+            30 +
+            nameLength +
+            extraLength;
+
+
+        const data =
+            bytes.slice(
+                start,
+                start +
+                entry.compressedSize
+            );
+
+
+        if(entry.method === 0){
+
+            return data;
+
+        }
+
+
+        if(entry.method === 8){
+
+            return await inflateRaw(data);
+
+        }
+
+
+        throw new Error(
+            "不支援 ZIP 壓縮方法：" +
+            entry.method
+        );
+
+    }
+
+
+    return {get};
+
+}
+
+
+/* =====================================================
+   EPUB state
+===================================================== */
+
+const epub = {
+
+    zip:null,
+
+    rootFile:"",
+
+    chapters:[],
+
+    chapter:0,
+
+    character:0,
+
+    chars:[]
+
+};
+
+
+function storageKey(){
+
+    return "epub-tts-reader-position-v22";
+
+}
+
+
+function savePosition(){
+
+    try{
+
+        localStorage.setItem(
+
+            storageKey(),
+
+            JSON.stringify({
+
+                chapter:
+                    epub.chapter,
+
+                character:
+                    epub.character
+
+            })
+
+        );
+
+    }catch(e){
+
+        console.warn(e);
+
+    }
+
+}
+
+
+function loadPosition(){
+
+    try{
+
+        const raw =
+            localStorage.getItem(
+                storageKey()
+            );
+
+
+        if(!raw){
+
+            return {
+                chapter:0,
+                character:0
+            };
+
+        }
+
+
+        const value =
+            JSON.parse(raw);
+
+
+        return {
+
+            chapter:
+                Number(value.chapter) || 0,
+
+            character:
+                Number(value.character) || 0
+
+        };
+
+    }catch(e){
+
+        return {
+            chapter:0,
+            character:0
+        };
+
+    }
+
+}
+
+
+/* =====================================================
+   Path helpers
+===================================================== */
+
+function resolvePath(base,target){
+
+    const result = [];
+
+
+    const parts =
+        (
+            base +
+            "/" +
+            target
+        )
+        .split("/");
+
+
+    for(
+        const part of parts
+    ){
+
+        if(
+            !part ||
+            part === "."
+        ){
+
+            continue;
+
+        }
+
+
+        if(part === ".."){
+
+            result.pop();
+
+        }else{
+
+            result.push(part);
+
+        }
+
+    }
+
+
+    return result.join("/");
+
+}
+
+
+function dirname(path){
+
+    const i =
+        path.lastIndexOf("/");
+
+
+    if(i < 0){
+
+        return "";
+
+    }
+
+
+    return path.slice(0,i);
+
+}
+
+
+/* =====================================================
+   XML helpers
+===================================================== */
+
+function parseXML(text){
+
+    const doc =
+        new DOMParser()
+        .parseFromString(
+            text,
+            "application/xml"
+        );
+
+
+    const parserError =
+        doc.querySelector(
+            "parsererror"
+        );
+
+
+    if(parserError){
+
+        throw new Error(
+            "XML/XHTML 解析失敗。"
+        );
+
+    }
+
+
+    return doc;
+
+}
+
+
+/* =====================================================
+   EPUB loading
+===================================================== */
+
+async function loadEPUB(file){
+
+    setStatus(
+        "正在讀取 EPUB…"
+    );
+
+
+    /*
+       1. ZIP
+    */
+
+    const zip =
+        await openZip(file);
+
+
+    epub.zip =
+        zip;
+
+
+    setStatus(
+        "正在讀取 EPUB container.xml…"
+    );
+
+
+    /*
+       2. container.xml
+    */
+
+    const containerText =
+        decoder.decode(
+
+            await zip.get(
+                "META-INF/container.xml"
+            )
+
+        );
+
+
+    const container =
+        parseXML(
+            containerText
+        );
+
+
+    const root =
+        container.querySelector(
+            "rootfile"
+        );
+
+
+    if(!root){
+
+        throw new Error(
+            "container.xml 中沒有 rootfile。"
+        );
+
+    }
+
+
+    const rootFile =
+        root.getAttribute(
+            "full-path"
+        );
+
+
+    if(!rootFile){
+
+        throw new Error(
+            "rootfile 沒有 full-path。"
+        );
+
+    }
+
+
+    epub.rootFile =
+        rootFile;
+
+
+    /*
+       3. OPF
+    */
+
+    setStatus(
+        "正在讀取 EPUB 書籍結構…"
+    );
+
+
+    const opfText =
+        decoder.decode(
+
+            await zip.get(
+                rootFile
+            )
+
+        );
+
+
+    const opf =
+        parseXML(
+            opfText
+        );
+
+
+    const manifest =
+        new Map();
+
+
+    opf
+    .querySelectorAll(
+        "manifest item"
+    )
+    .forEach(
+        item => {
+
+            const id =
+                item.getAttribute(
+                    "id"
+                );
+
+
+            if(id){
+
+                manifest.set(
+                    id,
+                    item
+                );
+
+            }
+
+        }
+    );
+
+
+    const spineItems =
+        opf.querySelectorAll(
+            "spine itemref"
+        );
+
+
+    const base =
+        dirname(rootFile);
+
+
+    const chapters = [];
+
+
+    /*
+       4. Spine
+    */
+
+    for(
+        const ref
+        of spineItems
+    ){
+
+        const idref =
+            ref.getAttribute(
+                "idref"
+            );
+
+
+        const item =
+            manifest.get(idref);
+
+
+        if(!item){
+
+            continue;
+
+        }
+
+
+        const href =
+            item.getAttribute(
+                "href"
+            );
+
+
+        if(!href){
+
+            continue;
+
+        }
+
+
+        /*
+           處理 href 中的 #anchor
+        */
+
+        const cleanHref =
+            href.split("#")[0];
+
+
+        const path =
+            resolvePath(
+                base,
+                decodeURIComponent(
+                    cleanHref
+                )
+            );
+
+
+        try{
+
+            const text =
+                decoder.decode(
+                    await zip.get(path)
+                );
+
+
+            const doc =
+                new DOMParser()
+                .parseFromString(
+                    text,
+                    "application/xhtml+xml"
+                );
+
+
+            const body =
+                doc.querySelector(
+                    "body"
+                );
+
+
+            if(!body){
+
+                continue;
+
+            }
+
+
+            const titleElement =
+                doc.querySelector(
+                    "title,h1,h2"
+                );
+
+
+            chapters.push({
+
+                title:
+                    titleElement
+                    ? titleElement.textContent.trim()
+                    : path,
+
+                path,
+
+                html:
+                    body.innerHTML
+
+            });
+
+        }catch(error){
+
+            console.warn(
+                "無法讀取章節：",
+                path,
+                error
+            );
+
+        }
+
+    }
+
+
+    if(!chapters.length){
+
+        throw new Error(
+            "找不到可閱讀的 EPUB 章節。\n" +
+            "這本 EPUB 可能使用了不相容的 EPUB 結構。"
+        );
+
+    }
+
+
+    epub.chapters =
+        chapters;
+
+
+    /*
+       5. Restore position
+    */
+
+    const saved =
+        loadPosition();
+
+
+    epub.chapter =
+        Math.min(
+            Math.max(
+                saved.chapter,
+                0
+            ),
+            chapters.length - 1
+        );
+
+
+    epub.character =
+        Math.max(
+            saved.character,
+            0
+        );
+
+
+    buildTOC();
+
+    renderChapter();
+
+
+    setStatus(
+        "EPUB 載入成功：" +
+        chapters.length +
+        " 個章節"
+    );
+
+}
+
+
+/* =====================================================
+   HTML -> character spans
+===================================================== */
+
+function makeReadable(html){
+
+    const container =
+        document.createElement(
+            "div"
+        );
+
+
+    container.innerHTML =
+        html;
+
+
+    container
+    .querySelectorAll(
+        "script,style,svg,canvas,form"
+    )
+    .forEach(
+        node => node.remove()
+    );
+
+
+    const walker =
+        document.createTreeWalker(
+
+            container,
+
+            NodeFilter.SHOW_TEXT
+
+        );
+
+
+    const nodes = [];
+
+
+    while(
+        walker.nextNode()
+    ){
+
+        nodes.push(
+            walker.currentNode
+        );
+
+    }
+
+
+    for(
+        const node of nodes
+    ){
+
+        const text =
+            node.nodeValue;
+
+
+        if(
+            !text ||
+            !text.trim()
+        ){
+
+            continue;
+
+        }
+
+
+        const fragment =
+            document.createDocumentFragment();
+
+
+        for(
+            const c of text
+        ){
+
+            if(
+                c === "\r" ||
+                c === "\n"
+            ){
+
+                continue;
+
+            }
+
+
+            const span =
+                document.createElement(
+                    "span"
+                );
+
+
+            span.className =
+                "char";
+
+
+            span.textContent =
+                c;
+
+
+            fragment.appendChild(
+                span
+            );
+
+        }
+
+
+        node.parentNode.replaceChild(
+            fragment,
+            node
+        );
+
+    }
+
+
+    return container;
+
+}
+
+
+/* =====================================================
+   Render
+===================================================== */
+
+function renderChapter(){
+
+    const chapter =
+        epub.chapters[
+            epub.chapter
+        ];
+
+
+    reader.innerHTML =
+        "";
+
+
+    reader.appendChild(
+
+        makeReadable(
+            chapter.html
+        )
+
+    );
+
+
+    epub.chars =
+        Array.from(
+            reader.querySelectorAll(
+                ".char"
+            )
+        );
+
+
+    if(
+        epub.character >=
+        epub.chars.length
+    ){
+
+        epub.character =
+            Math.max(
+                0,
+                epub.chars.length - 1
+            );
+
+    }
+
+
+    clearHighlight();
+
+    updatePosition();
+
+
+    $("playButton").disabled =
+        epub.chars.length === 0;
+
+
+    $("previousButton").disabled =
+        epub.chars.length === 0;
+
+
+    $("nextButton").disabled =
+        epub.chars.length === 0;
+
+}
+
+
+function clearHighlight(){
+
+    reader
+    .querySelectorAll(
+        ".char.active"
+    )
+    .forEach(
+        node =>
+            node.classList.remove(
+                "active"
+            )
+    );
+
+}
+
+
+function highlight(
+    index,
+    scroll=true
+){
+
+    if(
+        !epub.chars.length
+    ){
+
+        return;
+
+    }
+
+
+    index =
+        Math.max(
+            0,
+            Math.min(
+                index,
+                epub.chars.length - 1
+            )
+        );
+
+
+    epub.character =
+        index;
+
+
+    clearHighlight();
+
+
+    const node =
+        epub.chars[index];
+
+
+    node.classList.add(
+        "active"
+    );
+
+
+    if(scroll){
+
+        node.scrollIntoView({
+
+            behavior:"smooth",
+
+            block:"center"
+
+        });
+
+    }
+
+
+    updatePosition();
+
+    savePosition();
+
+}
+
+
+function updatePosition(){
+
+    $("position").textContent =
+
+        (
+            epub.chars.length
+            ? epub.character + 1
+            : 0
+        ) +
+        " / " +
+        epub.chars.length;
+
+}
+
+
+/* =====================================================
+   TOC
+===================================================== */
+
+function buildTOC(){
+
+    const toc =
+        $("toc");
+
+
+    toc.innerHTML = "";
+
+
+    epub.chapters.forEach(
+        (chapter,index)=>{
+
+            const button =
+                document.createElement(
+                    "button"
+                );
+
+
+            button.textContent =
+                (
+                    index + 1
+                ) +
+                ". " +
+                chapter.title;
+
+
+            button.onclick = ()=>{
+
+                stopAll();
+
+                epub.chapter =
+                    index;
+
+                epub.character =
+                    0;
+
+                renderChapter();
+
+                savePosition();
+
+                toc.style.display =
+                    "none";
+
+            };
+
+
+            toc.appendChild(
+                button
+            );
+
+        }
+    );
+
+
+    $("tocButton").disabled =
+        false;
+
+}
+
+
+/* =====================================================
+   Sentence segmentation
+===================================================== */
+
+function getSegment(){
+
+    const start =
+        epub.character;
+
+
+    if(
+        start >= epub.chars.length
+    ){
+
+        return null;
+
+    }
+
+
+    let text = "";
+
+    let end =
+        start;
+
+
+    while(
+        end < epub.chars.length
+    ){
+
+        const c =
+            epub.chars[end]
+            .textContent;
+
+
+        text += c;
+
+        end++;
+
+
+        if(
+            /[。！？!?]/.test(c) &&
+            text.length >= 8
+        ){
+
+            break;
+
+        }
+
+
+        if(
+            text.length >= 120
+        ){
+
+            break;
+
+        }
+
+    }
+
+
+    return {
+
+        text:text.trim(),
+
+        start,
+
+        end
+
+    };
+
+}
+
+
+/* =====================================================
+   Native TTS
+===================================================== */
+
+let nativeUtterance =
+    null;
+
+
+function getNativeLanguage(){
+
+    const lang =
+        $("hfLanguage").value;
+
+
+    if(lang === "English")
+        return "en-US";
+
+    if(lang === "Japanese")
+        return "ja-JP";
+
+    if(lang === "Korean")
+        return "ko-KR";
+
+    return "zh-TW";
+
+}
+
+
+function speakNative(){
+
+    if(
+        !("speechSynthesis" in window)
+    ){
+
+        setStatus(
+            "此瀏覽器沒有 SpeechSynthesis。"
+        );
+
+        return;
+
+    }
+
+
+    const segment =
+        getSegment();
+
+
+    if(!segment){
+
+        nextChapter();
+
+        return;
+
+    }
+
+
+    speechSynthesis.cancel();
+
+
+    highlight(
+        segment.start,
+        false
+    );
+
+
+    nativeUtterance =
+        new SpeechSynthesisUtterance(
+            segment.text
+        );
+
+
+    nativeUtterance.lang =
+        getNativeLanguage();
+
+
+    nativeUtterance.rate =
+        Number(
+            $("rate").value
+        );
+
+
+    nativeUtterance.onboundary =
+        event=>{
+
+            if(
+                typeof event.charIndex !==
+                "number"
+            ){
+
+                return;
+
+            }
+
+
+            const index =
+                Math.min(
+
+                    segment.end - 1,
+
+                    segment.start +
+                    event.charIndex
+
+                );
+
+
+            highlight(
+                index,
+                false
+            );
+
+        };
+
+
+    nativeUtterance.onend =
+        ()=>{
+
+            if(stopping)
+                return;
+
+
+            epub.character =
+                segment.end;
+
+
+            savePosition();
+
+
+            playReading();
+
+        };
+
+
+    nativeUtterance.onerror =
+        event=>{
+
+            if(!stopping){
+
+                setStatus(
+                    "系統 TTS 錯誤：" +
+                    (
+                        event.error ||
+                        "unknown"
+                    )
+                );
+
+            }
+
+        };
+
+
+    stopping = false;
+
+
+    $("stopButton").disabled =
+        false;
+
+
+    setStatus(
+        "iPhone 系統 TTS 播放中…"
+    );
+
+
+    speechSynthesis.speak(
+        nativeUtterance
+    );
+
+}
+
+
+/* =====================================================
+   Hugging Face loader
+
+   注意：
+
+   只有真的選 HF 時才執行。
+
+   EPUB 載入完全不會經過這裡。
+===================================================== */
+
+let gradioPromise = null;
+
+
+function loadGradioClient(){
+
+    if(gradioPromise){
+
+        return gradioPromise;
+
+    }
+
+
+    gradioPromise =
+        new Promise(
+            (resolve,reject)=>{
+
+                /*
+                   如果 CDN script 已經存在
+                */
+
+                if(
+                    window.gradioClient
+                ){
+
+                    resolve(
+                        window.gradioClient
+                    );
+
+                    return;
+
+                }
+
+
+                const script =
+                    document.createElement(
+                        "script"
+                    );
+
+
+                script.src =
+                    "https://cdn.jsdelivr.net/npm/@gradio/client/dist/index.min.js";
+
+
+                script.onload =
+                    ()=>{
+
+                        /*
+                           不同版本的 global
+                           名稱可能不同。
+
+                           優先尋找 window.gradio
+                        */
+
+                        const g =
+                            window.gradio ||
+                            window.Gradio ||
+                            window.gradioClient;
+
+
+                        if(g){
+
+                            resolve(g);
+
+                        }else{
+
+                            /*
+                               某些版本是 module only。
+                               告知使用者而不是影響 EPUB。
+                            */
+
+                            reject(
+                                new Error(
+                                    "Gradio Client CDN 已載入，但找不到 Client。"
+                                )
+                            );
+
+                        }
+
+                    };
+
+
+                script.onerror =
+                    ()=>{
+
+                        reject(
+                            new Error(
+                                "無法載入 Hugging Face Gradio Client CDN。"
+                            )
+                        );
+
+                    };
+
+
+                document.head.appendChild(
+                    script
+                );
+
+            }
+        );
+
+
+    return gradioPromise;
+
+}
+
+
+/*
+   為了避免 iPhone Safari 的 module
+   啟動問題，這裡額外提供一個
+   iframe / module fallback。
+
+   如果 CDN global 不存在，就動態
+   建立 module script。
+*/
+
+async function getGradioClient(){
+
+    try{
+
+        const g =
+            await loadGradioClient();
+
+
+        if(g.Client){
+
+            return g.Client;
+
+        }
+
+
+        if(
+            g.default &&
+            g.default.Client
+        ){
+
+            return g.default.Client;
+
+        }
+
+    }catch(firstError){
+
+        console.warn(
+            firstError
+        );
+
+    }
+
+
+    /*
+       最後才嘗試動態 ES module。
+
+       此時 EPUB 已經完全正常運作，
+       所以就算失敗也不影響 Reader。
+    */
+
+    return await new Promise(
+        (resolve,reject)=>{
+
+            const script =
+                document.createElement(
+                    "script"
+                );
+
+
+            script.type =
+                "module";
+
+
+            const id =
+                "__gradio_dynamic_" +
+                Date.now();
+
+
+            script.textContent = `
+
+                import {
+                    Client
+                } from
+                "https://cdn.jsdelivr.net/npm/@gradio/client/dist/index.min.js";
+
+                window.${id} = Client;
+
+            `;
+
+
+            document.head.appendChild(
+                script
+            );
+
+
+            const timer =
+                setInterval(
+                    ()=>{
+
+                        if(
+                            window[id]
+                        ){
+
+                            clearInterval(
+                                timer
+                            );
+
+                            resolve(
+                                window[id]
+                            );
+
+                        }
+
+                    },
+                    50
+                );
+
+
+            setTimeout(
+                ()=>{
+
+                    clearInterval(
+                        timer
+                    );
+
+
+                    if(
+                        !window[id]
+                    ){
+
+                        reject(
+                            new Error(
+                                "iPhone Safari 無法載入 Gradio Client。"
+                            )
+                        );
+
+                    }
+
+                },
+                15000
+            );
+
+        }
+    );
+
+}
+
+
+/* =====================================================
+   HF state
+===================================================== */
+
+let hfClient =
+    null;
+
+let hfClientName =
+    null;
+
+let hfAudio =
+    new Audio();
+
+let hfGeneration =
+    0;
+
+
+/* =====================================================
+   Connect HF
+===================================================== */
+
+async function connectHF(){
+
+    const space =
+        $("hfSpace")
+        .value
+        .trim();
+
+
+    if(!space){
+
+        throw new Error(
+            "沒有設定 Hugging Face Space。"
+        );
+
+    }
+
+
+    if(
+        hfClient &&
+        hfClientName === space
+    ){
+
+        return hfClient;
+
+    }
+
+
+    setStatus(
+        "正在載入 Hugging Face Client…"
+    );
+
+
+    const Client =
+        await getGradioClient();
+
+
+    hfClient =
+        await Client.connect(
+            space,
+            {
+
+                events:[
+                    "data",
+                    "status"
+                ],
+
+                status_callback:
+                    state=>{
+
+                        if(
+                            state &&
+                            state.message
+                        ){
+
+                            setStatus(
+                                "HF：" +
+                                state.message
+                            );
+
+                        }
+
+                    }
+
+            }
+        );
+
+
+    hfClientName =
+        space;
+
+
+    return hfClient;
+
+}
+
+
+/* =====================================================
+   HF TTS
+===================================================== */
+
+async function speakHF(){
+
+    const segment =
+        getSegment();
+
+
+    if(!segment){
+
+        nextChapter();
+
+        return;
+
+    }
+
+
+    const generation =
+        ++hfGeneration;
+
+
+    highlight(
+        segment.start,
+        false
+    );
+
+
+    try{
+
+        const client =
+            await connectHF();
+
+
+        setStatus(
+            "Qwen3-TTS 正在產生語音…"
+        );
+
+
+        /*
+           官方目前的 Space：
+
+           generate_custom_voice(
+               text,
+               language,
+               speaker,
+               instruct,
+               model_size
+           )
+
+           來源：
+           Qwen/Qwen3-TTS app.py
+        */
+
+        const result =
+            await client.predict(
+                "/generate_custom_voice",
+                {
+
+                    text:
+                        segment.text,
+
+                    language:
+                        $("hfLanguage").value,
+
+                    speaker:
+                        $("hfSpeaker").value,
+
+                    instruct:
+                        $("hfInstruct").value,
+
+                    model_size:
+                        $("hfModel").value
+
+                }
+            );
+
+
+        if(
+            generation !==
+            hfGeneration
+        ){
+
+            return;
+
+        }
+
+
+        const audio =
+            extractAudio(
+                result
+            );
+
+
+        if(!audio){
+
+            throw new Error(
+                "Qwen3-TTS 沒有返回音訊。"
+            );
+
+        }
+
+
+        await playHFAudio(
+            audio,
+            segment,
+            generation
+        );
+
+    }catch(error){
+
+        if(
+            generation !==
+            hfGeneration
+        ){
+
+            return;
+
+        }
+
+
+        console.error(
+            "HF error:",
+            error
+        );
+
+
+        setStatus(
+            "Hugging Face TTS 失敗：\n" +
+            error.message
+        );
+
+
+        alert(
+            "Hugging Face Qwen3-TTS 無法使用。\n\n" +
+            error.message +
+            "\n\n" +
+            "EPUB 本身沒有問題。\n" +
+            "你可以切換回「iPhone 系統 TTS」。"
+        );
+
+    }
+
+}
+
+
+/* =====================================================
+   Extract audio from Gradio result
+===================================================== */
+
+function extractAudio(result){
+
+    if(!result)
+        return null;
+
+
+    const data =
+        result.data;
+
+
+    if(
+        !Array.isArray(data)
+    ){
+
+        return null;
+
+    }
+
+
+    let audio =
+        data[0];
+
+
+    if(
+        Array.isArray(audio)
+    ){
+
+        audio =
+            audio[0];
+
+    }
+
+
+    if(
+        typeof audio === "string"
+    ){
+
+        return audio;
+
+    }
+
+
+    if(
+        audio &&
+        typeof audio === "object"
+    ){
+
+        if(audio.url)
+            return audio.url;
+
+        if(audio.path)
+            return audio.path;
+
+    }
+
+
+    return null;
+
+}
+
+
+/* =====================================================
+   Play HF audio
+===================================================== */
+
+async function playHFAudio(
+    source,
+    segment,
+    generation
+){
+
+    if(
+        generation !==
+        hfGeneration
+    ){
+
+        return;
+
+    }
+
+
+    hfAudio.pause();
+
+
+    hfAudio.src =
+        source;
+
+
+    hfAudio.currentTime =
+        0;
+
+
+    hfAudio.playbackRate =
+        Number(
+            $("rate").value
+        );
+
+
+    hfAudio.ontimeupdate =
+        ()=>{
+
+            if(
+                generation !==
+                hfGeneration
+            ){
+
+                return;
+
+            }
+
+
+            if(
+                !Number.isFinite(
+                    hfAudio.duration
+                ) ||
+                hfAudio.duration <= 0
+            ){
+
+                return;
+
+            }
+
+
+            const ratio =
+                hfAudio.currentTime /
+                hfAudio.duration;
+
+
+            const count =
+                segment.end -
+                segment.start;
+
+
+            const offset =
+                Math.floor(
+                    ratio * count
+                );
+
+
+            highlight(
+
+                Math.min(
+                    segment.end - 1,
+                    segment.start + offset
+                ),
+
+                false
+
+            );
+
+        };
+
+
+    hfAudio.onended =
+        ()=>{
+
+            if(
+                generation !==
+                hfGeneration
+            ){
+
+                return;
+
+            }
+
+
+            if(stopping)
+                return;
+
+
+            epub.character =
+                segment.end;
+
+
+            savePosition();
+
+
+            playReading();
+
+        };
+
+
+    setStatus(
+        "Qwen3-TTS 播放中…"
+    );
+
+
+    await hfAudio.play();
+
+}
+
+
+/* =====================================================
+   Playback
+===================================================== */
+
+let stopping =
+    false;
+
+
+function playReading(){
+
+    if(
+        !epub.chars.length
+    ){
+
+        return;
+
+    }
+
+
+    stopping =
+        false;
+
+
+    $("stopButton")
+        .disabled = false;
+
+
+    if(
+        $("ttsEngine").value ===
+        "hf"
+    ){
+
+        speakHF();
+
+    }else{
+
+        speakNative();
+
+    }
+
+}
+
+
+/* =====================================================
+   Stop
+===================================================== */
+
+function stopAll(){
+
+    stopping =
+        true;
+
+
+    hfGeneration++;
+
+
+    try{
+
+        speechSynthesis.cancel();
+
+    }catch(e){}
+
+
+    try{
+
+        hfAudio.pause();
+
+    }catch(e){}
+
+
+    savePosition();
+
+
+    $("stopButton")
+        .disabled = true;
+
+
+    setStatus(
+        "已停止；位置已保存。"
+    );
+
+}
+
+
+/* =====================================================
+   Chapter navigation
+===================================================== */
+
+function nextChapter(){
+
+    if(
+        epub.chapter <
+        epub.chapters.length - 1
+    ){
+
+        epub.chapter++;
+
+        epub.character =
+            0;
+
+        renderChapter();
+
+        savePosition();
+
+
+        setTimeout(
+            playReading,
+            150
+        );
+
+    }else{
+
+        stopAll();
+
+        setStatus(
+            "本書已朗讀完畢。"
+        );
+
+    }
+
+}
+
+
+function nextSegment(){
+
+    stopAll();
+
+
+    const segment =
+        getSegment();
+
+
+    if(!segment){
+
+        nextChapter();
+
+        return;
+
+    }
+
+
+    epub.character =
+        Math.min(
+            segment.end,
+            epub.chars.length - 1
+        );
+
+
+    highlight(
+        epub.character
+    );
+
+
+    playReading();
+
+}
+
+
+function previousSegment(){
+
+    stopAll();
+
+
+    epub.character =
+        Math.max(
+            0,
+            epub.character - 70
+        );
+
+
+    highlight(
+        epub.character
+    );
+
+
+    playReading();
+
+}
+
+
+/* =====================================================
+   Events
+===================================================== */
+
+$("epubFile")
+.addEventListener(
+    "change",
+    async event=>{
+
+        const file =
+            event.target.files[0];
+
+
+        if(!file)
+            return;
+
+
+        /*
+           這裡完全不會碰 HF。
+        */
+
+        stopAll();
+
+
+        try{
+
+            setStatus(
+                "已選擇 EPUB：" +
+                file.name
+            );
+
+
+            await loadEPUB(
+                file
+            );
+
+        }catch(error){
+
+            console.error(
+                error
+            );
+
+
+            setStatus(
+                "EPUB 載入失敗：\n" +
+                error.message
+            );
+
+
+            alert(
+                "EPUB 載入失敗：\n\n" +
+                error.message
+            );
+
+        }
+
+    }
+);
+
+
+$("playButton")
+.addEventListener(
+    "click",
+    ()=>{
+
+        if(
+            speechSynthesis.speaking ||
+            !hfAudio.paused
+        ){
+
+            stopAll();
+
+        }else{
+
+            playReading();
+
+        }
+
+    }
+);
+
+
+$("stopButton")
+.addEventListener(
+    "click",
+    stopAll
+);
+
+
+$("nextButton")
+.addEventListener(
+    "click",
+    nextSegment
+);
+
+
+$("previousButton")
+.addEventListener(
+    "click",
+    previousSegment
+);
+
+
+$("tocButton")
+.addEventListener(
+    "click",
+    ()=>{
+
+        const toc =
+            $("toc");
+
+
+        toc.style.display =
+            toc.style.display ===
+            "block"
+            ? "none"
+            : "block";
+
+    }
+);
+
+
+$("settingsButton")
+.addEventListener(
+    "click",
+    ()=>{
+
+        const settings =
+            $("settings");
+
+
+        settings.style.display =
+            settings.style.display ===
+            "block"
+            ? "none"
+            : "block";
+
+    }
+);
+
+
+$("rate")
+.addEventListener(
+    "input",
+    event=>{
+
+        $("rateValue")
+            .textContent =
+                Number(
+                    event.target.value
+                ).toFixed(2);
+
+
+        try{
+
+            hfAudio.playbackRate =
+                Number(
+                    event.target.value
+                );
+
+        }catch(e){}
+
+    }
+);
+
+
+$("hfSpace")
+.addEventListener(
+    "change",
+    ()=>{
+
+        hfClient =
+            null;
+
+        hfClientName =
+            null;
+
+    }
+);
+
+
+$("reader")
+.addEventListener(
+    "click",
+    event=>{
+
+        const target =
+            event.target.closest(
+                ".char"
+            );
+
+
+        if(!target)
+            return;
+
+
+        const index =
+            epub.chars.indexOf(
+                target
+            );
+
+
+        if(index < 0)
+            return;
+
+
+        stopAll();
+
+
+        highlight(
+            index,
+            true
+        );
+
+
+        setStatus(
+            "已定位到第 " +
+            (index + 1) +
+            " 個字。"
+        );
+
+    }
+);
+
+
+window.addEventListener(
+    "pagehide",
+    ()=>{
+        savePosition();
+    }
+);
+
+
+/* =====================================================
+   Initial
+===================================================== */
+
+$("playButton").disabled =
+    true;
+
+$("previousButton").disabled =
+    true;
+
+$("nextButton").disabled =
+    true;
+
+$("stopButton").disabled =
+    true;
+
+$("tocButton").disabled =
+    true;
+
+setStatus(
+    "尚未載入 EPUB"
+);
+
+</script>
+
+</body>
+</html>
